@@ -1,0 +1,10 @@
+PyQt6==6.4.0
+PyQt6-Qt6==6.4.0
+PyQt6-sip==13.4.0
+SQLAlchemy==2.0.1
+requests==2.31.0
+beautifulsoup4==4.12.2
+matplotlib==3.7.1
+opencv-python==4.7.0.72
+numpy==1.24.3
+Pillow==9.5.0
