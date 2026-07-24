@@ -178,3 +178,25 @@ cython_debug/
 
 # Coverage
 htmlcov/
+
+# ── Node / Frontend ─────────────────────────────────────────────────────
+node_modules/
+dist/
+.npm/
+.vite/
+
+# ── Backend ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# ── Environment ─────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Docker ──────────────────────────────────────────────────────────────
+docker-compose.override.yml

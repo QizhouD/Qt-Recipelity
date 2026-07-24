@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/recipes.db}
+      - DEBUG=${DEBUG:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AI_VISION_MODEL=${AI_VISION_MODEL:-gpt-5.6-luna}
+      - AI_IMAGE_MODEL=${AI_IMAGE_MODEL:-gpt-image-2}
+      - GENERATED_MEDIA_DIR=/app/data/generated
+    volumes:
+      - recipe_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  recipe_data:

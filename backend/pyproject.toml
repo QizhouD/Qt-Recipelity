@@ -1,0 +1,32 @@
+[project]
+name = "recipelity-backend"
+version = "0.1.0"
+description = "Recipelity — Intelligent Recipe Management API"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["N805", "B008"]  # N805: cls in hybrid property; B008: FastAPI Depends/Query in defaults
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
