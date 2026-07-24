@@ -1,95 +1,143 @@
-# Recipelity - Intelligent Recipe Management System
+# Recipelity — Intelligent Recipe Management
 
-## Overview
-Recipelity is a powerful recipe management software that supports importing recipes from websites, intelligent search and filtering, and nutrition analysis.
-![img_1.png](img_1.png)
+Recipelity is a web application built with Vue 3 and FastAPI for managing recipes, uploading food images, estimating nutrition, and creating recipe content with generative AI. The original PyQt desktop application remains in the repository, but active development now takes place in `frontend/` and `backend/`.
 
 ## Features
-- **Recipe Collection & Management**: Add, edit, delete, and organize your recipes
-- **Web Recipe Import**: Import recipes from popular cooking websites
-- **Intelligent Search & Filtering**: Search by keywords, tags, cooking time, difficulty, and cuisine
-- **Nutrition Analysis**: Analyze the nutritional content of recipes
-- **Food Image Analysis**: Identify ingredients from food images (simulated in this version)
 
-## System Requirements
-- Python 3.9+
-- PyQt6
-- SQLAlchemy
-- Requests
-- BeautifulSoup4
-- Matplotlib
-- OpenCV
+- Create, edit, delete, paginate, search, and filter recipes
+- Manage ingredients, quantities, cooking steps, tags, and cuisines
+- Upload JPEG, PNG, and WebP images
+- Correct image orientation, resize large images, and convert uploads to WebP
+- Display responsive recipe images with lazy loading and error fallbacks
+- Estimate nutrition from ingredient names, quantities, and units
+- Support common Chinese and English ingredient names
+- Convert grams, kilograms, milliliters, liters, pieces, tablespoons, and teaspoons
+- Report ingredients that could not be matched during nutrition analysis
+- Generate an editable recipe and nutrition draft from a food image
+- Generate a recipe cover image from recipe text
 
-## Installation
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/recipelity.git
-   cd recipelity
-   ```
+> AI-generated content and nutrition values are estimates. Review all results before saving or using them. They are not medical or professional dietary advice.
 
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+## Technology Stack
 
-3. For Python 3.13 compatibility, use:
-   ```
-   pip install -r requirements_fixed.txt
-   ```
+- Frontend: Vue 3, TypeScript, Vite, Pinia, Element Plus, and ECharts
+- Backend: Python 3.11+, FastAPI, Pydantic, and SQLAlchemy 2
+- Database: SQLite for current local development; see `NEXT_PHASE_PLAN.md` for the planned MySQL migration
+- AI: OpenAI Responses API and GPT Image
+- Quality: pytest, Ruff, Vitest, and TypeScript checks
+- Deployment: Docker Compose and Nginx
 
-## Running the Application
-To run the English version of Recipelity:
-```
-python main_en.py
+## Project Structure
+
+```text
+backend/                 FastAPI routes, models, services, and tests
+frontend/                Vue 3 frontend
+deploy/                  Backend/frontend Dockerfiles and Nginx configuration
+scripts/                 Database audit and migration utilities
+data/                    Runtime database and generated media
+core/, ui/, main*.py     Preserved legacy PyQt application
 ```
 
-## Usage Guide
+## Local Development
 
-### Adding a Recipe
-1. Click "File" > "Add Recipe" from the menu bar
-2. Fill in the recipe details, including name, description, ingredients, and steps
-3. Click "Save" to add the recipe to your collection
+### Backend
 
-### Importing a Recipe from URL
-1. Click "File" > "Import Recipe from URL" from the menu bar
-2. Enter the URL of a recipe from a supported website
-3. Review and edit the imported recipe details
-4. Click "Save" to add the recipe to your collection
+On Windows PowerShell:
 
-### Searching and Filtering Recipes
-1. Use the search box to find recipes by name or ingredients
-2. Filter by tags, cooking time, difficulty, and cuisine using the filter panel
-3. Click "Reset Filters" to clear all filters
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+cd backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
 
-### Analyzing Nutrition
-1. Select a recipe from the list
-2. Click "Analyze Nutrition" in the recipe detail panel
-3. View the nutritional analysis chart and data
+Backend services:
 
-### Analyzing Food Images
-1. Click "File" > "Analyze Ingredients from Image" from the menu bar
-2. Select an image file containing food
-3. View the recognized ingredients
-4. Optionally create a new recipe using the recognized ingredients
+- OpenAPI documentation: <http://127.0.0.1:8000/docs>
+- Health check: <http://127.0.0.1:8000/health/live>
 
-## Supported Websites for Import
-- Meishichina (www.meishichina.com)
-- Xiachufang (www.xiachufang.com)
-- Douguo (www.douguo.com)
-- Generic parsing for other websites
+### Frontend
 
-## Data Storage
-Recipes are stored in an SQLite database located at `data/recipes.db`.
+Open another terminal:
 
-## Troubleshooting
-### Database Issues
-If you encounter database path issues, please refer to `DATABASE_FIX.md` for solutions.
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-### Installation Issues
-For installation problems, especially with Python 3.13 compatibility, please refer to `INSTALLation_fix.md`.
+Open <http://127.0.0.1:5173/index.html>. The Vite development server proxies `/api` and `/media` requests to the backend.
 
-## Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
+## AI Configuration
+
+Copy `.env.example` to `backend/.env`:
+
+```powershell
+Copy-Item .env.example backend\.env
+```
+
+Configure the server-side API credentials:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_api_key
+AI_VISION_MODEL=gpt-5.6-luna
+AI_IMAGE_MODEL=gpt-image-2
+AI_REQUEST_TIMEOUT=90
+```
+
+Keep API keys in local environment variables or deployment-platform secrets. Never commit them to Git. Recipe management, image uploads, and nutrition analysis remain available without an API key; AI endpoints return an explicit configuration error.
+
+## Main API Endpoints
+
+```text
+GET    /api/v1/recipes
+POST   /api/v1/recipes
+GET    /api/v1/recipes/{id}
+PATCH  /api/v1/recipes/{id}
+DELETE /api/v1/recipes/{id}
+POST   /api/v1/recipes/{id}/nutrition:calculate
+POST   /api/v1/media/images
+POST   /api/v1/ai/recipe-from-image
+POST   /api/v1/ai/image-from-recipe
+```
+
+URL-based recipe importing has been removed from the active product flow and registered API.
+
+## Testing and Validation
+
+Run backend checks:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m ruff check app tests
+..\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+Build the frontend:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Backend tests cover recipe CRUD, search and filtering, nutrition calculation, image uploads, AI request validation, and safe behavior when AI credentials are unavailable.
+
+## Docker
+
+Build and start the application:
+
+```powershell
+docker compose up --build
+```
+
+The default web entry point is <http://localhost:8080>. SQLite data and generated media are stored in a named volume. Before production deployment, configure MySQL, HTTPS, backups, monitoring, and `OPENAI_API_KEY`.
+
+## Additional Documentation
+
+- [Refactoring plan](REFACTOR_PLAN.md)
+- [Next-phase plan](NEXT_PHASE_PLAN.md)
 
 ## License
-This project is licensed under the MIT License.
+
+MIT
