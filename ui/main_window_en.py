@@ -40,30 +40,6 @@ class ImageDownloader(QThread):
             self.download_failed.emit(self.url)
 
 
-class RecipeImportThread(QThread):
-    """Recipe import thread"""
-    import_progress = pyqtSignal(int, str)  # (progress, message)
-    import_finished = pyqtSignal(dict)  # (recipe_data)
-    import_failed = pyqtSignal(str)  # (error_message)
-
-    def __init__(self, url):
-        super().__init__()
-        self.url = url
-
-    def run(self):
-        try:
-            self.import_progress.emit(20, "Connecting to webpage...")
-            recipe_data = RecipeManager.import_recipe_from_url(self.url)
-
-            if recipe_data:
-                self.import_progress.emit(80, "Recipe parsing completed")
-                self.import_finished.emit(recipe_data)
-            else:
-                self.import_failed.emit("Could not parse recipe information from this webpage")
-        except Exception as e:
-            self.import_failed.emit(f"Import failed: {str(e)}")
-
-
 class NutritionAnalysisThread(QThread):
     """Nutrition analysis thread"""
     analysis_progress = pyqtSignal(int, str)  # (progress, message)
@@ -1217,10 +1193,6 @@ class MainWindow(QMainWindow):
         add_recipe_action = file_menu.addAction("Add Recipe")
         add_recipe_action.triggered.connect(self.on_add_recipe)
 
-        # Import from URL
-        import_url_action = file_menu.addAction("Import Recipe from URL")
-        import_url_action.triggered.connect(self.on_import_url)
-
         # Analyze from image
         analyze_image_action = file_menu.addAction("Analyze Ingredients from Image")
         analyze_image_action.triggered.connect(self.on_analyze_image)
@@ -1277,81 +1249,6 @@ class MainWindow(QMainWindow):
         dialog = RecipeEditDialog(None, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_data()
-
-    def on_import_url(self):
-        """Import recipe from URL"""
-        # Create URL input dialog
-        url, ok = QInputDialog.getText(self, "Import Recipe from URL", "Please enter the recipe webpage URL:")
-
-        if ok and url:
-            # Create progress dialog
-            progress_dialog = QProgressDialog("Importing recipe...", "Cancel", 0, 100, self)
-            progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-            progress_dialog.setMinimumDuration(0)
-            progress_dialog.setValue(0)
-
-            # Create import thread
-            self.import_thread = RecipeImportThread(url)
-            self.import_thread.import_progress.connect(progress_dialog.setValue)
-            self.import_thread.import_progress.connect(lambda p, m: progress_dialog.setLabelText(m))
-            self.import_thread.import_finished.connect(self.on_import_finished)
-            self.import_thread.import_failed.connect(self.on_import_failed)
-
-            # Connect cancel button
-            progress_dialog.canceled.connect(self.import_thread.terminate)
-
-            # Start thread
-            self.import_thread.start()
-            progress_dialog.exec()
-
-    @pyqtSlot(dict)
-    def on_import_finished(self, recipe_data):
-        """Recipe import finished"""
-        # Create edit dialog with pre-filled imported data
-        dialog = RecipeEditDialog(None, self)
-
-        # Fill data
-        dialog.name_edit.setText(recipe_data.get('name', ''))
-        dialog.description_edit.setText(recipe_data.get('description', ''))
-        dialog.prep_time_spin.setValue(recipe_data.get('prep_time', 0))
-        dialog.cook_time_spin.setValue(recipe_data.get('cook_time', 0))
-
-        # Set difficulty
-        difficulty = recipe_data.get('difficulty')
-        if difficulty and 1 <= difficulty <= 5:
-            dialog.difficulty_combo.setCurrentIndex(difficulty - 1)
-
-        dialog.cuisine_edit.setText(recipe_data.get('cuisine', ''))
-        dialog.image_url_edit.setText(recipe_data.get('image_url', ''))
-
-        # Set ingredients
-        ingredients_text = ""
-        for ingredient in recipe_data.get('ingredients', []):
-            amount = ingredient.get('amount', '')
-            unit = ingredient.get('unit', '')
-            ingredients_text += f"{ingredient.get('name', '')}: {amount} {unit}\n"
-
-        dialog.ingredients_text.setText(ingredients_text.strip())
-
-        # Set steps
-        steps_text = ""
-        for step in recipe_data.get('steps', []):
-            steps_text += f"{step.get('order', '')}. {step.get('description', '')}\n"
-
-        dialog.steps_text.setText(steps_text.strip())
-
-        # Set tags
-        tags = recipe_data.get('tags', [])
-        dialog.tags_edit.setText(", ".join(tags))
-
-        # Show dialog
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_data()
-
-    @pyqtSlot(str)
-    def on_import_failed(self, error_message):
-        """Recipe import failed"""
-        QMessageBox.warning(self, "Failed", error_message)
 
     def on_analyze_image(self):
         """Analyze ingredients from image"""

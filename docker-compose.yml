@@ -1,4 +1,20 @@
 services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: recipelity
+      MYSQL_USER: recipelity
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -6,16 +22,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/recipes.db}
+      - DATABASE_URL=mysql+asyncmy://recipelity:${MYSQL_PASSWORD:-password}@mysql:3306/recipelity?charset=utf8mb4
       - DEBUG=${DEBUG:-false}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
       - AI_PROVIDER=${AI_PROVIDER:-openai}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - AI_VISION_MODEL=${AI_VISION_MODEL:-gpt-5.6-luna}
       - AI_IMAGE_MODEL=${AI_IMAGE_MODEL:-gpt-image-2}
+      - MEDIA_ROOT=/app/data/uploads
       - GENERATED_MEDIA_DIR=/app/data/generated
     volumes:
       - recipe_data:/app/data
+      - media_data:/app/data/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
@@ -36,3 +57,5 @@ services:
 
 volumes:
   recipe_data:
+  mysql_data:
+  media_data:

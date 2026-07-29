@@ -9,10 +9,23 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
+_connect_args: dict = {}
+_engine_kwargs: dict = {"echo": settings.debug}
+
+if "sqlite" in settings.database_url:
+    _connect_args["check_same_thread"] = False
+else:
+    # MySQL — connection pool settings
+    _engine_kwargs.update(
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=3600,
+    )
+
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
+    **_engine_kwargs,
+    connect_args=_connect_args,
 )
 
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

@@ -2,7 +2,7 @@
   <div class="filter-panel">
     <h3>筛选条件</h3>
     <el-input v-model="local.keyword" placeholder="搜索菜名或食材..." clearable
-              @input="emitChange" @clear="emitChange">
+              @input="onKeywordInput" @clear="onKeywordClear">
       <template #prefix><span>🔍</span></template>
     </el-input>
 
@@ -50,10 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { RecipeSearchFilters } from "@/types";
 import apiClient from "@/api/client";
-import { ref } from "vue";
 
 const props = defineProps<{ filters: RecipeSearchFilters }>();
 const emit = defineEmits<{ change: []; reset: [] }>();
@@ -63,12 +62,30 @@ const cuisines = ref<string[]>([]);
 
 const local = reactive({ ...props.filters });
 
+// Debounce timer for keyword search (300ms)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 watch(() => props.filters, (f) => Object.assign(local, f), { deep: true });
 
 function emitChange() {
   Object.assign(props.filters, local);
   emit("change");
 }
+
+function onKeywordInput() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    emitChange();
+  }, 300);
+}
+function onKeywordClear() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  emitChange();
+}
+
+onBeforeUnmount(() => {
+  if (debounceTimer) clearTimeout(debounceTimer);
+});
 
 onMounted(async () => {
   try {

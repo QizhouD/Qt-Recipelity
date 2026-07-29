@@ -173,17 +173,6 @@ class RecipeSearchParams(BaseModel):
     max_difficulty: int | None = Field(None, ge=1, le=5)
 
 
-# ── URL import ───────────────────────────────────────────────────────────────
-
-
-class UrlImportRequest(BaseModel):
-    url: str = Field(..., min_length=1, max_length=2048)
-
-
-class UrlImportResponse(BaseModel):
-    recipe: RecipeCreate
-
-
 # ── image recognition ───────────────────────────────────────────────────────
 
 

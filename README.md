@@ -21,8 +21,9 @@ Recipelity is a web application built with Vue 3 and FastAPI for managing recipe
 ## Technology Stack
 
 - Frontend: Vue 3, TypeScript, Vite, Pinia, Element Plus, and ECharts
-- Backend: Python 3.11+, FastAPI, Pydantic, and SQLAlchemy 2
-- Database: SQLite for current local development; see `NEXT_PHASE_PLAN.md` for the planned MySQL migration
+- Backend: Python 3.11+, FastAPI, Pydantic, and SQLAlchemy 2 (async)
+- Database: MySQL 8.4 (Docker / production); SQLite for local dev, tests, and legacy data migration
+- Migrations: Alembic (``alembic upgrade head`` creates the schema; ``scripts/migrate_db.py`` imports legacy data)
 - AI: OpenAI Responses API and GPT Image
 - Quality: pytest, Ruff, Vitest, and TypeScript checks
 - Deployment: Docker Compose and Nginx
@@ -88,6 +89,19 @@ AI_REQUEST_TIMEOUT=90
 
 Keep API keys in local environment variables or deployment-platform secrets. Never commit them to Git. Recipe management, image uploads, and nutrition analysis remain available without an API key; AI endpoints return an explicit configuration error.
 
+## Frontend Pages
+
+| 路由 | 页面 | 说明 |
+|---|---|---|
+| `/` | 重定向 | 自动跳转到 `/recipes` |
+| `/recipes` | 菜谱列表 | 搜索、筛选、分页；筛选条件同步到 URL |
+| `/recipes/new` | 新建菜谱 | 食材/步骤增删排序、图片上传、校验 |
+| `/recipes/:id` | 菜谱详情 | 营养分析结果、食材匹配、404 提示 |
+| `/recipes/:id/edit` | 编辑菜谱 | 脏状态检测、离开确认 |
+| `/ai-studio` | AI 创作 | 图片→菜谱、菜谱→图片、API Key 未配置提示 |
+| `/about` | 关于 | 项目说明、营养估算与 AI 使用声明 |
+| `/:pathMatch(.*)*` | 404 | 返回菜谱列表按钮 |
+
 ## Main API Endpoints
 
 ```text
@@ -100,6 +114,8 @@ POST   /api/v1/recipes/{id}/nutrition:calculate
 POST   /api/v1/media/images
 POST   /api/v1/ai/recipe-from-image
 POST   /api/v1/ai/image-from-recipe
+GET    /health/live
+GET    /health/ready
 ```
 
 URL-based recipe importing has been removed from the active product flow and registered API.
@@ -114,24 +130,91 @@ cd backend
 ..\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Build the frontend:
+Run frontend checks:
 
 ```powershell
 cd frontend
-npm run build
+npm run lint              # ESLint + vue-tsc
+npm run test:unit         # Vitest unit tests
+npm run test:e2e          # Playwright E2E tests (headless)
+npm run test:e2e:headed   # Playwright E2E tests (headed browser)
+npm run build             # Production build
 ```
-
-Backend tests cover recipe CRUD, search and filtering, nutrition calculation, image uploads, AI request validation, and safe behavior when AI credentials are unavailable.
 
 ## Docker
 
-Build and start the application:
+Build and start the full stack (MySQL + Backend + Frontend):
 
 ```powershell
+Copy-Item .env.example .env
+# Edit .env to set MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, and OPENAI_API_KEY
 docker compose up --build
 ```
 
-The default web entry point is <http://localhost:8080>. SQLite data and generated media are stored in a named volume. Before production deployment, configure MySQL, HTTPS, backups, monitoring, and `OPENAI_API_KEY`.
+The default web entry point is <http://localhost:8080>. The backend runs Alembic migrations automatically on startup (``alembic upgrade head``). Persistent data is stored in named volumes:
+
+| Volume | Contents |
+|---|---|
+| `mysql_data` | MySQL 8.4 database files |
+| `recipe_data` | Application data (generated media) |
+| `media_data` | Uploaded recipe images (survives container rebuild) |
+
+### Smoke Test
+
+After starting the stack, run the smoke test:
+
+```powershell
+bash scripts/smoke_test.sh
+```
+
+Or manually verify:
+- <http://localhost:8000/health/live> — backend liveness
+- <http://localhost:8000/health/ready> — backend readiness (DB connected)
+- <http://localhost:8080/> — frontend homepage
+- <http://localhost:8080/recipes/1> — SPA deep link (should not 404)
+- <http://localhost:8080/api/v1/recipes?page=1> — API via nginx proxy
+
+Configure ``.env`` with real secrets before production deployment. See ``.env.example`` for reference.
+
+### Media Uploads
+
+Uploaded images are saved to the directory configured by ``MEDIA_ROOT`` (default: ``data/uploads``) and served under ``/media/``. In Docker, this directory is backed by the ``media_data`` named volume — images persist across container recreations.
+
+Supported formats: JPEG, PNG, WebP. Max file size: 5 MB (configurable via ``IMAGE_MAX_BYTES``).
+
+## Database Migration
+
+### Fresh Setup (Recommended Path A)
+
+1. Start MySQL (Docker or external) and create the empty database.
+2. Run Alembic to create the schema:
+   ```bash
+   cd backend
+   DATABASE_URL=mysql+asyncmy://recipelity:password@localhost:3306/recipelity?charset=utf8mb4 \
+     alembic upgrade head
+   ```
+3. Import legacy SQLite data (idempotent — safe to re-run):
+   ```bash
+   python scripts/migrate_db.py data/recipes.db \
+     --target mysql+asyncmy://recipelity:password@localhost:3306/recipelity?charset=utf8mb4
+   ```
+
+### Existing Verified Database (Path B)
+
+Only use ``alembic stamp head`` on a database whose schema you have verified matches the Alembic head revision exactly. This marks the revision as applied without running migrations:
+
+```bash
+DATABASE_URL=mysql+asyncmy://... alembic stamp head
+```
+
+### Local Development (SQLite)
+
+```bash
+cd backend
+DATABASE_URL=sqlite+aiosqlite:///./data/recipes.db alembic upgrade head
+```
+
+> **⚠️ Always back up your original SQLite file before running any migration.** Do not run ``alembic upgrade head`` directly on an existing ``data/recipes.db`` — if tables already exist, Alembic will fail with "table already exists". Use the two-step path: create a fresh target DB with Alembic, then import data with ``migrate_db.py``.
 
 ## Additional Documentation
 

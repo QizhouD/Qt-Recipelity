@@ -195,8 +195,18 @@ __pycache__/
 
 # ── Environment ─────────────────────────────────────────────────────────
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Local agent state
+.claude/
+.codex/
 
 # ── Docker ──────────────────────────────────────────────────────────────
 docker-compose.override.yml
+
+# ── Playwright ───────────────────────────────────────────────────────────
+playwright-report/
+test-results/
+e2e/screenshots/
+e2e/videos/

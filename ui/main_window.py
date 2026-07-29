@@ -37,29 +37,6 @@ class ImageDownloader(QThread):
         except Exception as e:
             self.download_failed.emit(self.url)
 
-class RecipeImportThread(QThread):
-    """食谱导入食谱线程"""
-    import_progress = pyqtSignal(int, str)  # (progress, message)
-    import_finished = pyqtSignal(dict)  # (recipe_data)
-    import_failed = pyqtSignal(str)  # (error_message)
-    
-    def __init__(self, url):
-        super().__init__()
-        self.url = url
-    
-    def run(self):
-        try:
-            self.import_progress.emit(20, "正在连接到网页...")
-            recipe_data = RecipeManager.import_recipe_from_url(self.url)
-            
-            if recipe_data:
-                self.import_progress.emit(80, "食谱解析完成")
-                self.import_finished.emit(recipe_data)
-            else:
-                self.import_failed.emit("无法解析该网页的食谱信息")
-        except Exception as e:
-            self.import_failed.emit(f"导入失败: {str(e)}")
-
 class NutritionAnalysisThread(QThread):
     """营养分析线程"""
     analysis_progress = pyqtSignal(int, str)  # (progress, message)
@@ -1049,10 +1026,6 @@ class MainWindow(QMainWindow):
         add_recipe_action = file_menu.addAction("添加食谱")
         add_recipe_action.triggered.connect(self.on_add_recipe)
         
-        # 从URL导入
-        import_url_action = file_menu.addAction("从URL导入食谱")
-        import_url_action.triggered.connect(self.on_import_url)
-        
         # 从图片分析
         analyze_image_action = file_menu.addAction("从图片分析食材")
         analyze_image_action.triggered.connect(self.on_analyze_image)
@@ -1109,81 +1082,6 @@ class MainWindow(QMainWindow):
         dialog = RecipeEditDialog(None, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_data()
-    
-    def on_import_url(self):
-        """从URL导入食谱"""
-        # 创建URL输入对话框
-        url, ok = QInputDialog.getText(self, "从URL导入食谱", "请输入食谱网页URL:")
-        
-        if ok and url:
-            # 创建进度对话框
-            progress_dialog = QProgressDialog("正在导入食谱...", "取消", 0, 100, self)
-            progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-            progress_dialog.setMinimumDuration(0)
-            progress_dialog.setValue(0)
-            
-            # 创建导入线程
-            self.import_thread = RecipeImportThread(url)
-            self.import_thread.import_progress.connect(progress_dialog.setValue)
-            self.import_thread.import_progress.connect(lambda p, m: progress_dialog.setLabelText(m))
-            self.import_thread.import_finished.connect(self.on_import_finished)
-            self.import_thread.import_failed.connect(self.on_import_failed)
-            
-            # 连接取消按钮
-            progress_dialog.canceled.connect(self.import_thread.terminate)
-            
-            # 启动线程
-            self.import_thread.start()
-            progress_dialog.exec()
-    
-    @pyqtSlot(dict)
-    def on_import_finished(self, recipe_data):
-        """食谱导入完成"""
-        # 创建编辑对话框，预填充导入的数据
-        dialog = RecipeEditDialog(None, self)
-        
-        # 填充数据
-        dialog.name_edit.setText(recipe_data.get('name', ''))
-        dialog.description_edit.setText(recipe_data.get('description', ''))
-        dialog.prep_time_spin.setValue(recipe_data.get('prep_time', 0))
-        dialog.cook_time_spin.setValue(recipe_data.get('cook_time', 0))
-        
-        # 设置难度
-        difficulty = recipe_data.get('difficulty')
-        if difficulty and 1 <= difficulty <= 5:
-            dialog.difficulty_combo.setCurrentIndex(difficulty - 1)
-        
-        dialog.cuisine_edit.setText(recipe_data.get('cuisine', ''))
-        dialog.image_url_edit.setText(recipe_data.get('image_url', ''))
-        
-        # 设置食材
-        ingredients_text = ""
-        for ingredient in recipe_data.get('ingredients', []):
-            amount = ingredient.get('amount', '')
-            unit = ingredient.get('unit', '')
-            ingredients_text += f"{ingredient.get('name', '')}: {amount} {unit}\n"
-        
-        dialog.ingredients_text.setText(ingredients_text.strip())
-        
-        # 设置步骤
-        steps_text = ""
-        for step in recipe_data.get('steps', []):
-            steps_text += f"{step.get('order', '')}. {step.get('description', '')}\n"
-        
-        dialog.steps_text.setText(steps_text.strip())
-        
-        # 设置标签
-        tags = recipe_data.get('tags', [])
-        dialog.tags_edit.setText(", ".join(tags))
-        
-        # 显示对话框
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_data()
-    
-    @pyqtSlot(str)
-    def on_import_failed(self, error_message):
-        """食谱导入失败"""
-        QMessageBox.warning(self, "失败", error_message)
     
     def on_analyze_image(self):
         """从图片分析食材"""

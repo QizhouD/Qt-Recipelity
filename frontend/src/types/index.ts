@@ -24,6 +24,8 @@ export interface Nutrition {
   sodium?: number;
   source?: string;
   calculated_at?: string;
+  matched_ingredients?: number;
+  unmatched_ingredients?: string[];
 }
 
 export interface Tag {

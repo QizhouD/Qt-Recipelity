@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import apiClient from "@/api/client";
 import type {
+  Nutrition,
   PaginatedResponse,
   RecipeDetail,
   RecipeSummary,
@@ -11,8 +12,9 @@ export const useRecipeStore = defineStore("recipe", () => {
   const recipes = ref<RecipeSummary[]>([]);
   const total = ref(0);
   const page = ref(1);
-  const pageSize = ref(20);
+  const pageSize = ref(12);
   const loading = ref(false);
+  const error = ref<string | null>(null);
   const currentRecipe = ref<RecipeDetail | null>(null);
 
   // Current filters
@@ -26,37 +28,62 @@ export const useRecipeStore = defineStore("recipe", () => {
     max_difficulty: undefined as number | undefined,
   });
 
+  // Request cancellation: abort previous fetch when a new one starts
+  let abortController: AbortController | null = null;
+
   async function fetchRecipes() {
+    // Cancel any in-flight request
+    if (abortController) {
+      abortController.abort();
+    }
+    abortController = new AbortController();
+
     loading.value = true;
+    error.value = null;
     try {
-      const params: Record<string, string> = {
-        page: String(page.value),
-        page_size: String(pageSize.value),
-      };
-      if (filters.value.keyword) params.keyword = filters.value.keyword;
-      if (filters.value.cuisine) params.cuisine = filters.value.cuisine;
-      if (filters.value.min_time) params.min_time = String(filters.value.min_time);
-      if (filters.value.max_time) params.max_time = String(filters.value.max_time);
-      if (filters.value.min_difficulty) params.min_difficulty = String(filters.value.min_difficulty);
-      if (filters.value.max_difficulty) params.max_difficulty = String(filters.value.max_difficulty);
-      filters.value.tags.forEach((t) => {
-        params.tags = t; // axios handles repeated params
-      });
+      const params = new URLSearchParams();
+      params.set("page", String(page.value));
+      params.set("page_size", String(pageSize.value));
+      if (filters.value.keyword) params.set("keyword", filters.value.keyword);
+      if (filters.value.cuisine) params.set("cuisine", filters.value.cuisine);
+      if (filters.value.min_time != null) params.set("min_time", String(filters.value.min_time));
+      if (filters.value.max_time != null) params.set("max_time", String(filters.value.max_time));
+      if (filters.value.min_difficulty != null)
+        params.set("min_difficulty", String(filters.value.min_difficulty));
+      if (filters.value.max_difficulty != null)
+        params.set("max_difficulty", String(filters.value.max_difficulty));
+      // Tags: append each tag as a separate "tags" entry for repeated query params
+      for (const t of filters.value.tags) {
+        params.append("tags", t);
+      }
 
       const resp = await apiClient.get<PaginatedResponse<RecipeSummary>>(
-        "/recipes", { params: { ...params, tags: filters.value.tags } }
+        `/recipes?${params.toString()}`,
+        { signal: abortController.signal },
       );
       recipes.value = resp.data.items;
       total.value = resp.data.total;
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      error.value = (e as { message?: string })?.message || "加载菜谱失败";
     } finally {
       loading.value = false;
     }
   }
 
   async function fetchRecipe(id: number) {
-    const resp = await apiClient.get<RecipeDetail>(`/recipes/${id}`);
-    currentRecipe.value = resp.data;
-    return resp.data;
+    loading.value = true;
+    error.value = null;
+    try {
+      const resp = await apiClient.get<RecipeDetail>(`/recipes/${id}`);
+      currentRecipe.value = resp.data;
+      return resp.data;
+    } catch (e: unknown) {
+      error.value = (e as { message?: string })?.message || "加载菜谱详情失败";
+      throw e;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function createRecipe(data: Record<string, unknown>) {
@@ -73,8 +100,8 @@ export const useRecipeStore = defineStore("recipe", () => {
     await apiClient.delete(`/recipes/${id}`);
   }
 
-  async function calculateNutrition(id: number) {
-    const resp = await apiClient.post(`/recipes/${id}/nutrition:calculate`);
+  async function calculateNutrition(id: number): Promise<Nutrition> {
+    const resp = await apiClient.post<Nutrition>(`/recipes/${id}/nutrition:calculate`);
     return resp.data;
   }
 
@@ -92,8 +119,20 @@ export const useRecipeStore = defineStore("recipe", () => {
   }
 
   return {
-    recipes, total, page, pageSize, loading, currentRecipe, filters,
-    fetchRecipes, fetchRecipe, createRecipe, updateRecipe, deleteRecipe,
-    calculateNutrition, resetFilters,
+    recipes,
+    total,
+    page,
+    pageSize,
+    loading,
+    error,
+    currentRecipe,
+    filters,
+    fetchRecipes,
+    fetchRecipe,
+    createRecipe,
+    updateRecipe,
+    deleteRecipe,
+    calculateNutrition,
+    resetFilters,
   };
 });
