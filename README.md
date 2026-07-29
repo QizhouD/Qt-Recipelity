@@ -91,16 +91,16 @@ Keep API keys in local environment variables or deployment-platform secrets. Nev
 
 ## Frontend Pages
 
-| 路由 | 页面 | 说明 |
+| Route | Page | Description |
 |---|---|---|
-| `/` | 重定向 | 自动跳转到 `/recipes` |
-| `/recipes` | 菜谱列表 | 搜索、筛选、分页；筛选条件同步到 URL |
-| `/recipes/new` | 新建菜谱 | 食材/步骤增删排序、图片上传、校验 |
-| `/recipes/:id` | 菜谱详情 | 营养分析结果、食材匹配、404 提示 |
-| `/recipes/:id/edit` | 编辑菜谱 | 脏状态检测、离开确认 |
-| `/ai-studio` | AI 创作 | 图片→菜谱、菜谱→图片、API Key 未配置提示 |
-| `/about` | 关于 | 项目说明、营养估算与 AI 使用声明 |
-| `/:pathMatch(.*)*` | 404 | 返回菜谱列表按钮 |
+| `/` | Redirect | Automatically redirects to `/recipes` |
+| `/recipes` | Recipe list | Search, filtering, pagination, and URL-synchronized filters |
+| `/recipes/new` | Create recipe | Reorder ingredients and steps, upload images, and validate input |
+| `/recipes/:id` | Recipe details | Nutrition results, ingredient matching, and not-found handling |
+| `/recipes/:id/edit` | Edit recipe | Unsaved-change detection and navigation confirmation |
+| `/ai-studio` | AI Studio | Image-to-recipe and recipe-to-image workflows with configuration guidance |
+| `/about` | About | Project overview and nutrition/AI usage disclaimers |
+| `/:pathMatch(.*)*` | Not found | 404 page with a link back to the recipe list |
 
 ## Main API Endpoints
 
@@ -152,6 +152,10 @@ docker compose up --build
 ```
 
 The default web entry point is <http://localhost:8080>. The backend runs Alembic migrations automatically on startup (``alembic upgrade head``). Persistent data is stored in named volumes:
+
+MySQL is exposed to local database tools on port `3307` by default. Connect with host
+`localhost`, port `3307`, database/user `recipelity`, and the password configured by
+`MYSQL_PASSWORD`. Containers continue to connect internally through `mysql:3306`.
 
 | Volume | Contents |
 |---|---|

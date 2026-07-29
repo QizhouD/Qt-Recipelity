@@ -6,6 +6,8 @@ services:
       MYSQL_DATABASE: recipelity
       MYSQL_USER: recipelity
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
