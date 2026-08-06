@@ -118,6 +118,11 @@ GET    /health/live
 GET    /health/ready
 ```
 
+Every HTTP response includes an `X-Request-ID` header. Clients may provide a safe
+request ID using the same header; otherwise the server generates one. Access logs
+are emitted as JSON and intentionally exclude request bodies, headers, query strings,
+database URLs, and API keys.
+
 URL-based recipe importing has been removed from the active product flow and registered API.
 
 ## Testing and Validation

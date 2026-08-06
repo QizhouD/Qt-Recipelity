@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
+    log_level: str = "INFO"
 
     # Generative AI (optional; never commit the API key)
     ai_provider: str = "openai"
@@ -40,8 +41,6 @@ class Settings(BaseSettings):
     ai_vision_model: str = "gpt-5.6-luna"
     ai_image_model: str = "gpt-image-2"
     ai_request_timeout: int = 90
-    generated_media_dir: str = "data/generated"
-
     # Security
     allowed_origins: str = "http://localhost:5173"
 

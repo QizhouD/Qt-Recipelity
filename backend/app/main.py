@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,10 @@ from app.api.ai import router as ai_router
 from app.api.media import router as media_router
 from app.api.recipes import router as recipes_router
 from app.core.config import settings
+from app.core.request_context import RequestContextMiddleware
 from app.db.session import Base, engine, get_db
+
+logging.getLogger("recipelity.access").setLevel(settings.log_level.upper())
 
 
 @asynccontextmanager
@@ -45,7 +48,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(recipes_router)
 app.include_router(ai_router)
@@ -55,22 +60,6 @@ app.include_router(media_router)
 media_dir = Path(settings.media_root)
 media_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=media_dir), name="media")
-
-# ── Global exception handlers — never leak stack traces ─────────────────
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Catch-all: log the real error, return a safe message to the client."""
-    import logging
-
-    logger = logging.getLogger("recipelity")
-    logger.exception("Unhandled exception on %s %s", request.method, request.url)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "服务器内部错误，请稍后重试"},
-    )
-
 
 @app.get("/health/live")
 async def health_live():
